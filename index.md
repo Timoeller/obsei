@@ -1,3 +1,4 @@
+
 <p align="center">
     <table style="border-collapse: collapse; border: none;">
         <tr style="border-collapse: collapse; border: none;">
@@ -5,7 +6,7 @@
                 <img src="https://raw.githubusercontent.com/lalitpagaria/obsei/master/images/logos/obsei_200x200.png" width="100" height="100" />
             </th>
             <th style="border-collapse: collapse; border: none;">
-                <h1>Obsei: OBserve, SEgment and Inform</h1>
+                <h1>Obsei: Observe, Analyze and Inform</h1>
             </th>
         </tr>
     </table>
@@ -30,12 +31,20 @@
     <a href="https://github.com/lalitpagaria/obsei/issues">
         <img alt="Open Issues" src="https://img.shields.io/github/issues/lalitpagaria/obsei">
     </a>
+    <a href="https://pyup.io/repos/github/lalitpagaria/obsei/">
+        <img alt="pyup" src="https://pyup.io/repos/github/lalitpagaria/obsei/shield.svg">
+    </a>
+   <a href="https://pyup.io/repos/github/lalitpagaria/obsei/">
+        <img src="https://pyup.io/repos/github/lalitpagaria/obsei/python-3-shield.svg" alt="Python 3" />
+    </a>
+
 </p>
 
-**Obsei** is intended to be a workflow automation tool for text segmentation need. *Obsei* consist of -
- - **Observer**, observes platform like Twitter, Facebook, App Stores, Google reviews, Amazon reviews and feed that information to,
- - **Segmenter**, which perform text classification and sentiment analysis and feed that information to,
- - **Informer**, which send it to ticketing system (Jira, Zendesk, etc), data store or other places for further action and analysis.
+
+**Obsei** is intended to be a workflow automation tool for text analysis need. *Obsei* consist of -
+ - **Observer**, observes platform like Twitter, Facebook, App Stores, Google reviews, Amazon reviews etc and feed that information to,
+ - **Analyzer**, which perform text analysis like classification, sentiment, translation, PII etc and feed that information to,
+ - **Informer**, which send it to ticketing system, data store etc for further action and analysis.
 
 Current flow -
 
@@ -45,14 +54,13 @@ A future concept (Coming Soon! :slightly_smiling_face:)
 
 ![](https://raw.githubusercontent.com/lalitpagaria/obsei/master/images/Obsei-future-concept.png)
 
-
 ## How to use
 
 To try in Colab Notebook click: [![Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/lalitpagaria/obsei/blob/master/example/Obsei_playstore_classification_logger_example.ipynb)
 
 To try in Binder click: [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/lalitpagaria/obsei/HEAD?filepath=example%2FObsei_playstore_classification_logger_example.ipynb)
 
-Click on following steps and create your workflow -
+Expend following steps and create your workflow -
 
 <details><summary><b>Step 1: Prerequisite</b></summary>
 
@@ -73,6 +81,7 @@ git clone https://github.com/lalitpagaria/obsei.git
 cd obsei
 pip install --editable .
 ```
+
 </details>
 <details><summary><b>Step 3: Configure Source/Observer</b></summary>
 
@@ -230,7 +239,9 @@ source = RedditScrapperSource()
 
 </details>
 
-<details><summary><b>Step 4: Configure Analyzer/Segmenter</b></summary>
+<details><summary><b>Step 4: Configure Analyzer</b></summary>
+
+<i>Note: To run transformers in an offline mode, check [transformers offline mode](https://huggingface.co/transformers/installation.html#offline-mode).</i>
 
 <table ><tbody ><tr></tr><tr>
 <td><details ><summary><img style="vertical-align:middle;margin:2px 10px" src="https://raw.githubusercontent.com/lalitpagaria/obsei/master/images/logos/classification.png" width="20" height="20"><b>Text Classification</b></summary><hr>
@@ -301,6 +312,36 @@ analyzer_config = None
 # initialize translator
 analyzer = TranslationAnalyzer(
     model_name_or_path="Helsinki-NLP/opus-mt-hi-en"
+)
+```
+</details>
+</td>
+</tr>
+<tr>
+<td><details ><summary><img style="vertical-align:middle;margin:2px 10px" src="https://raw.githubusercontent.com/lalitpagaria/obsei/master/images/logos/pii.png" width="20" height="20"><b>PII Anonymizer</b></summary><hr>
+
+ ```python
+from obsei.analyzer.pii_analyzer import PresidioEngineConfig, PresidioModelConfig, \ 
+    PresidioPIIAnalyzer, PresidioPIIAnalyzerConfig
+
+# initialize pii analyzer's config
+analyzer_config = PresidioPIIAnalyzerConfig(
+    # Whether to return only pii analysis or anonymize text
+    analyze_only=False,
+    # Whether to return detail information about anonymization decision
+    return_decision_process=True
+)
+
+# initialize pii analyzer
+analyzer = PresidioPIIAnalyzer(
+    engine_config=PresidioEngineConfig(
+        # spacy and stanza nlp engines are supported
+        # For more info refer 
+        # https://microsoft.github.io/presidio/analyzer/developing_recognizers/#utilize-spacy-or-stanza
+        nlp_engine_name="spacy",
+        # Update desired spacy model and language
+        models=[PresidioModelConfig(model_name="en_core_web_lg", lang_code="en")]
+    )
 )
 ```
 </details>
@@ -519,6 +560,11 @@ analyzer_response_list = text_analyzer.analyze_input(
 # for idx, an_response in enumerate(analyzer_response_list):
 #    logger.info(f"analyzer_response#'{idx}'='{an_response.__dict__}'")
 
+# Analyzer output added to segmented_data
+# Uncomment inorder to log it
+# for idx, an_response in enumerate(analyzer_response_list):
+#    logger.info(f"analyzed_data#'{idx}'='{an_response.segmented_data.__dict__}'")
+
 # This will send analyzed output to configure sink ie Slack, Zendesk etc
 sink_response_list = sink.send_data(analyzer_response_list, sink_config)
 
@@ -537,47 +583,10 @@ python example.py
 ```
 </details>
 
-## Rest interface
-Start docker with default configuration file:
-```shell
-docker run -d --name obesi -p 9898:9898 lalitpagaria/obsei:latest
-```
-Start docker with custom configuration file (Assuming you have configfile `config.yaml` at `/home/user/obsei/config` at host machine):
-```shell
-docker run -d --name obesi -v "/home/user/obsei/config:/home/user/config" -e "OBSEI_CONFIG_PATH=/home/user/config" -e "OBSEI_CONFIG_FILENAME=config.yaml" -p 9898:9898 lalitpagaria/obsei:latest
-```
-Start docker locally with `docker-compose`:
-```shell
-docker-compose up --build
-```
-Following environment variables are useful to customize various parameters -
-- `OBSEI_CONFIG_PATH`: Configuration file path (default: ../config)
-- `OBSEI_CONFIG_FILENAME`: Configuration file name (default: rest.yaml)
-- `OBSEI_NUM_OF_WORKERS`: Number of workers for rest API server (default: 1)
-- `OBSEI_WORKER_TIMEOUT`: Worker idle timeout in seconds (default: 180)
-- `OBSEI_SERVER_PORT`: Rest API server port (default: 9898)
-- `OBSEI_WORKER_TYPE`: Gunicorn worker type (default: uvicorn.workers.UvicornWorker)
-
-## Components and Integrations
-
-- **Source/Observer**: Twitter, Play Store Reviews, Apple App Store Reviews, Reddit, Email (Facebook, Instagram, Google reviews, Amazon reviews, Slack, Microsoft Team, Chat-bots etc planned in future)
-- **Analyzer/Segmenter**: Sentiment, Text classification and Entity extraction (QA, Natural Search, FAQ, etc are planned in future)
-- **Sink/Informer**: HTTP API, ElasticSearch, DailyGet, Slack, Zendesk and Jira (Salesforce, Hubspot, Microsoft Team, etc planned in future)
-- **Processor/WorkflowEngine**: Simple integration between Source, Analyser and Sink (Rich workflows using rule engine planned in future)
-- **Convertor**: Very important part, which convert data from analyzer format to the format sink understand. It is very helpful in any customizations, refer `dailyget_sink.py`, `jira_sink.py` or `zendesk_sink.py`.
-
-**Note:** In order to use some integrations you would need credentials, refer following list -
-- [Twitter](https://twitter.com/): To make authorized API call, get access from [dev portal](https://developer.twitter.com/en/apply-for-access). Read about [search api](https://developer.twitter.com/en/docs/twitter-api/tweets/search/introduction) for more details. 
-- [Play Store](https://play.google.com/): To make authorized API calls, get [service account's credentials](https://developers.google.com/identity/protocols/oauth2/service-account). Read about [review api](https://googleapis.github.io/google-api-python-client/docs/dyn/androidpublisher_v3.reviews.html) for more details.
-- [Reddit](https://www.reddit.com/): To make authorized API calls, create [client app](https://www.reddit.com/prefs/apps). For more detail refer [link](https://praw.readthedocs.io/en/latest/getting_started/authentication.html).
-- [Slack](https://slack.com/): To send message to Slack channel, get bot or user token. Refer [link](https://api.slack.com/authentication/token-types#bot).
-- *Email*: Email read only via IMAP servers are supported. Refer [link](https://www.systoolsgroup.com/imap/) for popular IMAP servers (like for Gmail).
-
-## Model selection
-Any model listed in [Named Entity Recognition](https://huggingface.co/models?filter=token-classification), [Text Classification](https://huggingface.co/models?filter=text-classification) and [Zero-Shot Classification](https://huggingface.co/models?filter=zero-shot-classification) can be used with Segmenter.
-
-## Examples
-Refer [example](https://github.com/lalitpagaria/obsei/tree/master/example) and [config](https://github.com/lalitpagaria/obsei/tree/master/config) folders for `obsei` usage and configurations.
-
-## Changelog
-Refer [releases](https://github.com/lalitpagaria/obsei/releases) and [projects](https://github.com/lalitpagaria/obsei/projects).
+## Use cases
+*Obsei* use cases are following, but not limited to -
+- Automatic customer issue creation based on sentiment analysis (reduction of MTTD)
+- Proper tagging of ticket based for example login issue, signup issue, delivery issue etc (reduction of MTTR)
+- Checking effectiveness of social media marketing campaign
+- Extraction of deeper insight from feedbacks on various platforms
+- Research purpose
